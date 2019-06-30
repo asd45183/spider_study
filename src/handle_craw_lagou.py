@@ -9,11 +9,9 @@ import json
 import multiprocessing
 import re
 import time
-
 import requests
-
 from src.logconfig import Logger
-
+from src.handle_insert_data import lagou_mysql
 log = Logger()
 
 
@@ -29,9 +27,9 @@ class HandleLaGou(object):
 
     # 获取全国所有城市列表
     def handle_city(self):
-        # 正则匹配
-        # city_search = re.compile(r'zhaopin/">(.*)</a>')
-        city_search = re.compile(r'.?com\/.+\/.?">(.+)</a>')
+        # 正则匹配所有城市
+        #city_search = re.compile(r'zhaopin/">(.*)</a>')
+        city_search = re.compile(r'.?com\/.+\/.?">(.*?)</a>')
         # 定义url
         city_url = "https://www.lagou.com/jobs/allCity.html"
         city_result = self.handle_request(method="GET", url=city_url)
@@ -50,6 +48,7 @@ class HandleLaGou(object):
             total_page = total_page_search.search(first_response).group(1)
         # 没有岗位信息抛出的异常
         except:
+            print("当前城市不存在该类型的职位，城市信息:%s" % city)
             return
         else:
             # 返回页码
@@ -59,17 +58,22 @@ class HandleLaGou(object):
                     'pn': i,
                     'kd': 'python'
                 }
+                log.debug("当前页码%s,总页码%s" % (i, total_page))
                 page_url = "https://www.lagou.com/jobs/positionAjax.json?city=%s&needAddtionalResult=false" % city
+                log.debug("当前page_url%s" % page_url)
                 referer_url = "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=" \
                               "true&labelWords=&suginput=" % city
+                log.debug("当前referer_url%s" % referer_url)
                 # referer 需要encode
                 self.headers['Referer'] = referer_url.encode()
-                # 传入city
                 response = self.handle_request("POST", url=page_url, data=data, info=city)
+                log.debug("response:%s" % str(response))
+                # 传入city
                 json_data = json.loads(response)
-                job_list = json_data["content"]["positionResult"]["result"]
+                job_list = json_data['content']['positionResult']['result']
                 for job in job_list:
-                    print(job)
+                    lagou_mysql.insert_iterm(job)
+                    log.debug("job:%s" % str(job))
 
     # 构造公共请求方法
     def handle_request(self, method, url, data=None, info=None):
@@ -100,11 +104,23 @@ class HandleLaGou(object):
                 # 重新获取cookis
                 first_response = self.handle_request(method="GET", url=first_request)
                 # 休息10S 模拟人为操作
-                time.sleep(10)
+                time.sleep(15)
                 continue
             response.encoding = 'utf-8'
             if "频繁" in response.text:
                 print("频繁")
+                # 先清除cookis
+                self.lagou_session.cookies.clear()
+                # 传入info 中的city
+                first_request = "https://www.lagou.com/jobs/list_python?" \
+                                "city=%s&cl=false&fromSearch=true&labelWords=&suginput=" % info
+                # 重新获取cookis
+                first_response = self.handle_request(method="GET", url=first_request)
+                # 休息10S 模拟人为操作
+                time.sleep(10)
+                continue
+            elif " 302 " in response.text:
+                print("发现302")
                 # 先清除cookis
                 self.lagou_session.cookies.clear()
                 # 传入info 中的city
@@ -121,8 +137,9 @@ class HandleLaGou(object):
 if __name__ == '__main__':
     lagou = HandleLaGou()
     lagou.handle_city()
+    print(lagou.city_list)
     # 实例化进程池 进程数2
-    pool = multiprocessing.Pool(2)
+    pool = multiprocessing.Pool(3)
     for city in lagou.city_list:
         pool.apply_async(lagou.handle_city_job, args=(city,))
     # 关闭进程池
