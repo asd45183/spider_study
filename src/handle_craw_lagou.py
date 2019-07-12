@@ -28,8 +28,9 @@ class HandleLaGou(object):
     # 获取全国所有城市列表
     def handle_city(self):
         # 正则匹配所有城市
-        #city_search = re.compile(r'zhaopin/">(.*)</a>')
+        # city_search = re.compile(r'zhaopin/">(.*)</a>')
         city_search = re.compile(r'.?com\/.+\/.?">(.*?)</a>')
+        # city_search = re.compile((r'www\.lagou\.com\/.*\/">(.*?)</a>'))
         # 定义url
         city_url = "https://www.lagou.com/jobs/allCity.html"
         city_result = self.handle_request(method="GET", url=city_url)
@@ -40,6 +41,8 @@ class HandleLaGou(object):
 
     # 获取当前城市的工作列表
     def handle_city_job(self, city):
+        # first_request = \
+        #     "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=true&labelWords=&suginput=" % city
         first_request = \
             "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=true&labelWords=&suginput=" % city
         first_response = self.handle_request(method="GET", url=first_request)
@@ -61,6 +64,8 @@ class HandleLaGou(object):
                 log.debug("当前页码%s,总页码%s" % (i, total_page))
                 page_url = "https://www.lagou.com/jobs/positionAjax.json?city=%s&needAddtionalResult=false" % city
                 log.debug("当前page_url%s" % page_url)
+                # referer_url = "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=" \
+                #               "true&labelWords=&suginput=" % city
                 referer_url = "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=" \
                               "true&labelWords=&suginput=" % city
                 log.debug("当前referer_url%s" % referer_url)
@@ -112,8 +117,9 @@ class HandleLaGou(object):
                 # 先清除cookis
                 self.lagou_session.cookies.clear()
                 # 传入info 中的city
-                first_request = "https://www.lagou.com/jobs/list_python?" \
-                                "city=%s&cl=false&fromSearch=true&labelWords=&suginput=" % info
+                first_request = \
+                    "https://www.lagou.com/jobs/list_python?city=%s&cl=false&fromSearch=true&labelWords=&suginput=" % info
+                first_response = self.handle_request(method="GET", url=first_request)
                 # 重新获取cookis
                 first_response = self.handle_request(method="GET", url=first_request)
                 # 休息10S 模拟人为操作
@@ -139,9 +145,10 @@ if __name__ == '__main__':
     lagou.handle_city()
     print(lagou.city_list)
     # 实例化进程池 进程数2
-    pool = multiprocessing.Pool(3)
+    pool = multiprocessing.Pool(2)
     for city in lagou.city_list:
         pool.apply_async(lagou.handle_city_job, args=(city,))
+        time.sleep(0.1)
     # 关闭进程池
     pool.close()
     pool.join()

@@ -75,7 +75,11 @@ class LaGouTables(Base_Class):
     # 抓取日期
     crawl_date = Column(String(length=20), nullable=False)
 
+    # 爬取的职位类别（python/java？）
+    thirdType = Column(String(length=10), nullable=False)
+
 
 if __name__ == '__main__':
     # 创建数据表
     LaGouTables.metadata.create_all(engin)
+
